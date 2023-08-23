@@ -7,6 +7,7 @@ project:
 # Source files must be in ./src and you must list each source file separately
   source_files:        
     - tt_um_rgb_mixer.v
+    - rgb_mixer.v
     - encoder.v
     - debounce.v
     - pwm.v
