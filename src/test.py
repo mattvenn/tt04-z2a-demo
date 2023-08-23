@@ -1,12 +1,20 @@
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, Timer, ClockCycles
+from encoder import Encoder
 
+clocks_per_phase = 10
 
-segments = [ 63, 6, 91, 79, 102, 109, 124, 7, 127, 103 ]
+async def run_encoder_test(encoder, max_count):
+    for i in range(clocks_per_phase * 2 * max_count):
+        await encoder.update(1)
+
+    # let noisy transition finish, otherwise can get an extra count
+    for i in range(10):
+        await encoder.update(0)
 
 @cocotb.test()
-async def test_7seg(dut):
+async def test_rgb_mixer(dut):
     dut._log.info("start")
     clock = Clock(dut.clk, 10, units="us")
     cocotb.start_soon(clock.start())
@@ -14,35 +22,31 @@ async def test_7seg(dut):
     # reset
     dut._log.info("reset")
     dut.rst_n.value = 0
-    # set the compare value
-    dut.ui_in.value = 1
+
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
 
-    # the compare value is shifted 10 bits inside the design to allow slower counting
-    max_count = dut.ui_in.value << 10
-    dut._log.info(f"check all segments with MAX_COUNT set to {max_count}")
-    # check all segments and roll over
-    for i in range(15):
-        dut._log.info("check segment {}".format(i))
-        await ClockCycles(dut.clk, max_count)
-        assert int(dut.segments.value) == segments[i % 10]
+    encoder0 = Encoder(dut.clk, dut.enc0_a, dut.enc0_b, clocks_per_phase = clocks_per_phase, noise_cycles = clocks_per_phase / 4)
+    encoder1 = Encoder(dut.clk, dut.enc1_a, dut.enc1_b, clocks_per_phase = clocks_per_phase, noise_cycles = clocks_per_phase / 4)
+    encoder2 = Encoder(dut.clk, dut.enc2_a, dut.enc2_b, clocks_per_phase = clocks_per_phase, noise_cycles = clocks_per_phase / 4)
 
-        # all bidirectionals are set to output
-        assert dut.uio_oe == 0xFF
+    # pwm should all be low at start
+    assert dut.pwm0_out == 0
+    assert dut.pwm1_out == 0
+    assert dut.pwm2_out == 0
 
-    # reset
-    dut.rst_n.value = 0
-    # set a different compare value
-    dut.ui_in.value = 3
-    await ClockCycles(dut.clk, 10)
-    dut.rst_n.value = 1
+    # do 3 ramps for each encoder 
+    max_count = 255
+    await run_encoder_test(encoder0, max_count)
+    await run_encoder_test(encoder1, max_count)
+    await run_encoder_test(encoder2, max_count)
 
-    max_count = dut.ui_in.value << 10
-    dut._log.info(f"check all segments with MAX_COUNT set to {max_count}")
-    # check all segments and roll over
-    for i in range(15):
-        dut._log.info("check segment {}".format(i))
-        await ClockCycles(dut.clk, max_count)
-        assert int(dut.segments.value) == segments[i % 10]
-
+    # sync to pwm
+    await RisingEdge(dut.pwm0_out)
+    await FallingEdge(dut.clk)
+    # pwm should all be on for max_count 
+    for i in range(max_count): 
+        assert dut.pwm0_out == 1
+        assert dut.pwm1_out == 1
+        assert dut.pwm2_out == 1
+        await ClockCycles(dut.clk, 1)
