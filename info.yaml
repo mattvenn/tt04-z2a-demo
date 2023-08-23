@@ -11,7 +11,7 @@ project:
     - encoder.v
     - debounce.v
     - pwm.v
-  top_module:  "tt_um_rgb_mixer"      # put the name of your top module here, make it unique by prepending your github username
+  top_module:  "tt_um_z2a_demo"      # put the name of your top module here, make it unique by prepending your github username
 
 # How many tiles your design occupies? A single tile is about 167x108 uM.
   tiles: "1x1"    # Valid values: 1x1, 1x2, 2x2, 4x2 or 8x2
